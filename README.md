@@ -23,10 +23,29 @@
 
     -폴더를 삭제할 경우 
     -hdfs dfs -rm -r /<삭제하고 싶은 폴더 경로>
+# Map Reduce
+## 1. Map(데이터에서 필요한 정보를 뽑아낸다)
+- 입력: 한 줄씩 텍스트(데이터)를 받아온다
+- 출력: (Key, Value) 형태로 내보냄
+## 2. Reducer (같은 Key에 해당하는 value들을 계산해서 결과 출력)
 
-- mapper.py
+# Word Count
 
+## 1. text.txt 생성하긔
+```txt
+apple hello world
+hello hello apple
+world
+apple world
+hello world
+world hello
+world
+world
+apple
 ```
+
+## 2. mapper.py 생성하긔
+```python
 import sys
 
     for line in sys.stdin:
@@ -37,17 +56,35 @@ import sys
     for word in words:
         print(f'{word}\t1')
 ```
+- for line in sys.stdin: 외부에서 들어오는 데이터를 한 줄씩 읽는다
+- line.strip(): 공백 문자를 제거해주는 함수
+- line.split(): 문장을 띄어쓰기 기준으로 잘라준다
+    - "apple banana cherry" => ['apple', 'banana', 'cherry'] 
+- f'{word}\t1': 단어가 1번 나왔다는 뜻 
+    - apple 1 
+    - banana 1
+    - cherry 1
+- Mapper는 데이터를 → (key, value) 형태로 내보낸다 => Hadoop에서 key를 기준으로 자동으로 정렬해준다!!
+- Reducer는 같은 key끼리 모아서 더해준다 => 해당 단어가 총 몇번 나왔는지 세주는 역할
 
-- reducer.py
+## 3. reducer.py 생성하기
 
-```
+```python
+#!/user/bin env python3
 import sys
+
+# apple 1
+# apple 1
+# hello 1
+# hello 1
+# hello 1
+# ...
 
 last_word = None
 total_count = 0
 
 for line in sys.stdin:
-    word, value = line.split('\t')
+    word, value = line.split('\t') # hello	1 => "hello" , "1"
     value = int(value)
 
     if last_word == word:
@@ -59,11 +96,35 @@ for line in sys.stdin:
         total_count = value
 
 if last_word == word:
-    print(f'{last_word}\t{total_count}')
+    print(f'{last_word}\t{total_count}') # key 와 value를 구별할 때 tab을 이용하는게 규칙임
 ```
+- 맨 첫 시작 ex) apple 1 
+    - => last_word = None 
+    - => else의 if문 밖으로 간다 
+    - => last_word = apple , total_count = 1
+- apple 1인 경우
+    - => last word == apple
+    - => total_count = 2
+- banana 1인 경우
+    - => else: 로 간다
+    - => apple 2 를 프린트해준다
+    - => last word = banana, total_count = 1
+- 맨 마지막 ex) cherry 1
+    - => for 문 밖으로 나온다
+    - => cherry 1 을 프린트 해준다
+- **print할때는 {key}\t{value} tab으로 구별해주는게 규칙이다!!**
 
-실행 (경로 포함)
-hadoop jar ~/hadoop-3.3.6/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar -input /input/text.txt -output /output/wordcount -mapper /home/ubuntu/damf2/hadoop/0.wordcount/mapper.py  -reducer /home/ubuntu/damf2/hadoop/0.wordcount/reducer.py
+## 4. 실행 (경로 포함)
+- hadoop jar ~/hadoop-3.3.6/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar -input /input/text.txt -output /output/wordcount -mapper /home/ubuntu/damf2/hadoop/0.wordcount/mapper.py  -reducer /home/ubuntu/damf2/hadoop/0.wordcount/reducer.py
+
+- hadoop jar ~/hadoop-3.3.6/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar \: 
+    - Hadoop Streaming은 텍스트 데이터를 처리할 수 있도록 해주는 인터페이스, 
+    - Hadoop 설치 경로에 있는 Streaming jar 파일
+-  -input /input/text.txt \: 입력 파일 경로(text.txt를 기준으로 분석 시작)
+-  -output /output/wordcount \: 출력 파일 경로 
+-  -mapper 'python3 /home/ubuntu/damf2/hadoop/0.wordcount/mapper.py' \: 각 라인을 받아서 원하는 단위로 쪼개는 역할
+-  -reducer 'python3 /home/ubuntu/damf2/hadoop/0.wordcount/reducer.py': mapper가 출력한 걸 단어별로 합치는 역할
+- ex) text.txt: the cat in the hat => mapper.py: the 1 cat 1 in 1 the 1 hat 1 => reducer.py: the 2 cat 1 in 1 hat 1
 
 # CHMOD
 - rws/rws/rws (owner/group/others)
@@ -76,15 +137,6 @@ hadoop jar ~/hadoop-3.3.6/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar -inp
     - chmod 777 maper.py
 
 
-# Word Count
-- hadoop jar ~/hadoop-3.3.6/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar \: 
-    - Hadoop Streaming은 텍스트 데이터를 처리할 수 있도록 해주는 인터페이스, 
-    - Hadoop 설치 경로에 있는 Streaming jar 파일
--  -input /input/text.txt \: 입력 파일 경로(text.txt를 기준으로 분석 시작)
--  -output /output/wordcount \: 출력 파일 경로 
--  -mapper 'python3 /home/ubuntu/damf2/hadoop/0.wordcount/mapper.py' \: 각 라인을 받아서 원하는 단위로 쪼개는 역할
--  -reducer 'python3 /home/ubuntu/damf2/hadoop/0.wordcount/reducer.py': mapper가 출력한 걸 단어별로 합치는 역할
-- ex) text.txt: the cat in the hat => mapper.py: the 1 cat 1 in 1 the 1 hat 1 => reducer.py: the 2 cat 1 in 1 hat 1
 
 
 # 영화데이터 평균 구하기
@@ -107,6 +159,9 @@ for line in sys.stdin:
 
     print(f'{movie_id}\t{rating}') # 출력 
 ```
+- 1. line.strip()
+- 2. line.split() => key와 value를 각각 저장
+- 3. print 하기 => print(f'{key}\t{value}')
 
 ## 2. reducer.py 생성하기
 ```python
@@ -158,3 +213,55 @@ hdfs dfs -put access.log /input
 ```
 
 ## 2. mapper.py 작성하기
+```python
+import sys
+import re # 파이썬 내부에 구현되어있는 정규표현식 : reqular expression
+
+# :03:56:14
+time_pattern = re.compile(r':(\d{2}):(\d{2}):(\d{2})') # 정규표현식 => \d: 숫자 들어옴, \d{2}: 숫자가 두칸 들어와야 한다
+
+for line in sys.stdin:
+    line = line.strip()
+
+    match = time_pattern.search(line) # 한 줄에 있는 데이터에서 정규표현식과 일치하는 데이터만 match에 저장한다
+
+    if match: # match라는 값이 있으면
+        hour = match.group(1) # group(1) : 소괄호로 묶어놓은 그룹 첫번째 => 시간만 추출한다
+        print(f'{hour}\t1')
+```
+- import re : 정규표현식 사용할거다
+- re.compile: 문자열 형태의 정규표현식 -> 객체로 생성해줌
+- pattern.search: 문자열중에서 정규표현식과 일치하는 부분을 찾아준다
+
+
+
+## 3. reducer.py 작성하기
+```python
+import sys
+
+last_hour = None
+total_count = 0
+
+# 03 1
+# 03 1
+# 04 1
+# 05 1
+# ....
+for line in sys.stdin:
+    line = line.strip()
+
+    hour, value = line.split() # 띄어쓰기를 기준으로 나눠서 본다
+    value = int(value) # 1은 숫자이므로 int로 바꿔줌
+
+    if last_hour == hour:
+        total_count += value
+    else:
+        if last_hour is not None:
+            print(f'{last_hour}\t{total_count}')
+
+        # 초기화 시켜주기
+        last_hour = hour
+        total_count = value
+        
+print(f'{last_hour}\t{total_count}')
+```
